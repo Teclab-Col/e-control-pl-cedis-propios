@@ -41,17 +41,6 @@ class RotulosPlModel {
           "UPDATE `TB_VALIDACION_ROTULOS` SET `LEIDO` = '1' WHERE TB_PEDIDOS_BARCODE_CAJA = ?";
         const updateValues = [TB_PEDIDOS_BARCODE_CAJA];
         await db.query(updateQuery, updateValues);
-        /*
-        const upsertQuery =
-          "INSERT INTO TB_VALIDACION_ROTULOS (`TB_PEDIDOS_BARCODE_CAJA`, `MANIFIESTO_URBANO`, `PLACA_DE_REPARTO`, `ESTADO`, `LEIDO`) VALUES (?, ?, ?, ?, 0) ON DUPLICATE KEY UPDATE `LEIDO` = 1";
-        const upsertValues = [
-          TB_PEDIDOS_BARCODE_CAJA,
-          MANIFIESTO_URBANO,
-          PLACA_DE_REPARTO,
-          ESTADO,
-        ];
-        await db.query(upsertQuery, upsertValues);
-        */
       } else {
         console.log("Nuevo manifiesto : " + [MANIFIESTO_URBANO]);
         // Si existe, realizar el update en TB_PEDIDOS_BARCODE_CAJA, LEIDO=1
