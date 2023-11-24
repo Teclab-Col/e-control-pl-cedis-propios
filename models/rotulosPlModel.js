@@ -1,7 +1,7 @@
 const db = require("../config/db");
 
 class RotulosPlModel {
-  static async findByPk(codigoDeBarrasReq) {
+  static async findByPk(codigoDeBarrasReq, codeSession) {
     const query =
       "SELECT CODIGO_PK, TB_PEDIDOS_BARCODE_CAJA, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO FROM TB_PEDIDOS_DIGITALIZADO WHERE TB_PEDIDOS_BARCODE_CAJA = ?";
     const values = [codigoDeBarrasReq];
@@ -41,6 +41,10 @@ class RotulosPlModel {
           "UPDATE `TB_VALIDACION_ROTULOS` SET `LEIDO` = '1' WHERE TB_PEDIDOS_BARCODE_CAJA = ?";
         const updateValues = [TB_PEDIDOS_BARCODE_CAJA];
         await db.query(updateQuery, updateValues);
+
+        const updateSession = `UPDATE TB_VALIDACION_ROTULOS SET CODE_SESSION = ${codeSession} WHERE MANIFIESTO_URBANO = ?`;
+        const updateValuesSession = [MANIFIESTO_URBANO];
+        await db.query(updateSession, updateValuesSession);
       } else {
         console.log("Nuevo manifiesto : " + [MANIFIESTO_URBANO]);
         // Si existe, realizar el update en TB_PEDIDOS_BARCODE_CAJA, LEIDO=1
