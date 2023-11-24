@@ -9,10 +9,13 @@ const https = require('https');
 const fs = require('fs');
 
 const app = express();
-const port = 3000;
+const IP = '0.0.0.0'; // Reemplaza con la dirección IP específica de tu servidor
+const PORT = 3000;
 
+// Middleware para parsear el cuerpo de las solicitudes en formato JSON
 app.use(bodyParser.json());
 
+// Rutas para distintas funcionalidades
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/consultarPl', consultarPlRoutes);
 app.use('/api/rotulosPl', rotulosPlRoutes);
@@ -26,6 +29,6 @@ const credentials = { key: privateKey, cert: certificate };
 // Crea un servidor HTTPS
 const httpsServer = https.createServer(credentials, app);
 
-httpsServer.listen(port, () => {
-  console.log(`Servidor en ejecución en https://localhost:${port}`);
+httpsServer.listen(PORT, IP, () => {
+  console.log(`Servidor en ejecución en https://${IP}:${PORT}`);
 });
