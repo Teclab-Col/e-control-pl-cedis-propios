@@ -14,7 +14,7 @@ const upload = multer({ storage: storage });
 class RotulosPlController {
 
   static async validarRotulo(req, res) {
-    const codigoDeBarrasReq = req.params.TB_PEDIDOS_BARCODE_CAJA.split('=')[1];
+    const codigoDeBarrasReq = req.params.codigoDeBarras.split('=')[1];
     try {
       const rotuloPl = await RotulosPlModel.findByPk(codigoDeBarrasReq);
       if (rotuloPl) {
