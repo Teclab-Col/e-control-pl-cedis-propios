@@ -19,7 +19,6 @@ class RotulosPlModel {
         MANIFIESTO_URBANO,
         PLACA_DE_REPARTO,
         ESTADO,
-        MENSAJE: INICIO,
       } = rotuloPl[0];
 
       // Verificar si ya existe el MANIFIESTO_URBANO en TB_VALIDACION_ROTULOS
@@ -60,6 +59,22 @@ class RotulosPlModel {
       }
 
       return rotuloPl[0];
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async findByCodeSession(codeSession) {
+    const query =
+      "SELECT MANIFIESTO_URBANO, LEIDO, COUNT(*) as CANTIDAD FROM `TB_VALIDACION_ROTULOS` WHERE CODE_SESSION = ? GROUP BY MANIFIESTO_URBANO , LEIDO";
+    const values = [codeSession];
+    try {
+      const [manifiestosCodeSession] = await db.query(query, values);
+      if (manifiestosCodeSession.length === 0) {
+        return null;
+      }
+      const { MANIFIESTO_URBANO, LEIDO, CANTIDAD } = manifiestosCodeSession[0];
+      return manifiestosCodeSession;
     } catch (error) {
       throw error;
     }

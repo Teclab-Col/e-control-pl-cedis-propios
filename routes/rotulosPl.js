@@ -6,7 +6,13 @@ const AuthMiddleware = require("../middlewares/authMiddleware");
 
 // Rutas CRUD para rutulos
 router.get(
-  "/:codigoDeBarras/:codeSession",
+  "/:codeSession", //"/manifiestos/:codeSession",
+  AuthMiddleware.verificarToken,
+  RotulosPlController.obtenerManifiestos
+);
+
+router.get(
+  "/:codigoDeBarras/:codeSession", //"/rotulos/:codigoDeBarras/:codeSession",
   AuthMiddleware.verificarToken,
   RotulosPlController.validarRotulo
 );
