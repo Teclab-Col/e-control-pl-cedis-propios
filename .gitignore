@@ -1,8 +1,9 @@
-# Otros patrones ignorados
-/node_modules
-/build
+# Node.js
+node_modules/
+build/
 
-# Ignorar el archivo .env
+# Entorno
 .env
 
+# macOS
 .DS_Store
