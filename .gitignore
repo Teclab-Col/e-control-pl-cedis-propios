@@ -1,6 +1,6 @@
 # Otros patrones ignorados
-/node_modules
-/build
+./node_modules
+./build
 
 # Ignorar el archivo .env
 .env
