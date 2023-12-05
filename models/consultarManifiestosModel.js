@@ -1,9 +1,9 @@
-const { pool1, pool2 } = require('../config/db');
+const { pool1, pool2 } = require("../config/db");
 
 class ConsultarManifiestosModel {
-    static async findManifiestoByPkAndInsert(manifiestoReq) {
-        try {
-            const querySelect = `
+  static async findManifiestoByPkAndInsert(manifiestoReq) {
+    try {
+      const querySelect = `
                 SELECT TB_PEDIDOS_BARCODE_CAJA, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA
                 FROM TB_PEDIDOS_REGISTRADOS
                 WHERE MANIFIESTO_URBANO = ? 
@@ -12,25 +12,28 @@ class ConsultarManifiestosModel {
                 FROM TB_PEDIDOS_DIGITALIZADO
                 WHERE MANIFIESTO_URBANO = ?`;
 
-            const valueSelect = [manifiestoReq, manifiestoReq];
-            const resultSelect = await pool2.query(querySelect, valueSelect);
+      const valueSelect = [manifiestoReq, manifiestoReq];
+      const resultSelect = await pool2.query(querySelect, valueSelect);
 
-            if (resultSelect && resultSelect.length > 0) {
-                for (const rowDataWithoutPK of resultSelect) {
-                    await this.insertDataIntoPool1(rowDataWithoutPK);
-                }
-            } else {
-                console.error(`No se encontraron resultados para el manifiesto ${manifiestoReq}`);
-            }
-
-            return resultSelect;
-        } catch (error) {
-            throw error;
+      if (resultSelect && resultSelect.length > 0) {
+        for (const rowDataWithoutPK of resultSelect) {
+          await this.insertDataIntoPool1(rowDataWithoutPK);
         }
-    }
+      } else {
+        console.error(
+          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+        );
+      }
 
-    static async insertDataIntoPool1(rowDataWithoutPK) {
-      try {
+      return resultSelect;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async insertDataIntoPool1(rowDataWithoutPK) {
+    try {
+      /*
           // Obtén las columnas de la tabla de destino
           const destinationColumns = [
               'TB_PEDIDOS_BARCODE_CAJA', 'MANIFIESTO_URBANO', 'PLACA_DE_REPARTO', 'ESTADO',
@@ -73,14 +76,36 @@ class ConsultarManifiestosModel {
   
           console.log('Query de inserción:', queryInsert);
           console.log('Valores a insertar:', values);
-  
-          // Ejecuta la consulta de inserción
-          const result = await pool1.query(queryInsert, values);
-  
-          console.log('Inserción exitosa. Resultado:', result);
-      } catch (error) {
-          console.error("Error en la inserción:", error);
-      }
+ */
+      // Ejecuta la consulta de inserción
+      const queryInsert = `
+            INSERT INTO TB_VALIDACION_ROTULOS (TB_PEDIDOS_BARCODE_CAJA, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+      const valuesInsert = [
+        data.TB_PEDIDOS_BARCODE_CAJA,
+        data.MANIFIESTO_URBANO,
+        data.PLACA_DE_REPARTO,
+        data.ESTADO,
+        data.TB_PEDIDOS_MARCA,
+        data.TB_PEDIDOS_CODIGO_ZONA,
+        data.TB_PEDIDOS_CIUDAD,
+        data.TB_PEDIDOS_TIPO_PRODUCTO,
+        data.TB_PEDIDOS_CEDULA,
+      ];
+
+      // Utiliza la pool de conexión para realizar la inserción
+      await pool1.query(queryInsert, valuesInsert);
+
+      console.log(`Datos insertados en pool1: ${JSON.stringify(data)}`);
+
+      const result = await pool1.query(queryInsert, values);
+
+      console.log("Inserción exitosa. Resultado:", result);
+    } catch (error) {
+      console.error("Error en la inserción:", error);
+    }
   }
 }
 
