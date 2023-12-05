@@ -17,7 +17,11 @@ class ConsultarManifiestosModel {
 
       if (resultSelect && resultSelect.length > 0) {
         for (const rowDataWithoutPK of resultSelect) {
-          await this.insertDataIntoPool1(rowDataWithoutPK);
+          const objectValues = Object.values(rowDataWithoutPK);
+          for (const values of objectValues) {
+            const res = values;
+            await this.insertDataIntoPool1(res);
+          }
         }
       } else {
         console.error(
@@ -31,34 +35,33 @@ class ConsultarManifiestosModel {
     }
   }
 
-  static async insertDataIntoPool1(rowDataWithoutPK) {
-    try {
-      const queryInsert = `
-                INSERT INTO TB_VALIDACION_ROTULOS (TB_PEDIDOS_BARCODE_CAJA, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            `;
+  static async insertDataIntoPool1(res) {
+    const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
+    console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
+    if (valorBarcodeCaja) {
+      try {
+        const queryInsert = `
+            INSERT INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
 
-      const valuesInsert = [
-        rowDataWithoutPK.TB_PEDIDOS_BARCODE_CAJA,
-        rowDataWithoutPK.MANIFIESTO_URBANO,
-        rowDataWithoutPK.PLACA_DE_REPARTO,
-        rowDataWithoutPK.ESTADO,
-        rowDataWithoutPK.TB_PEDIDOS_MARCA,
-        rowDataWithoutPK.TB_PEDIDOS_CODIGO_ZONA,
-        rowDataWithoutPK.TB_PEDIDOS_CIUDAD,
-        rowDataWithoutPK.TB_PEDIDOS_TIPO_PRODUCTO,
-        rowDataWithoutPK.TB_PEDIDOS_CEDULA,
-      ];
+        const valuesInsert = [
+          res.TB_PEDIDOS_BARCODE_CAJA,
+          res.MANIFIESTO_URBANO,
+          res.PLACA_DE_REPARTO,
+          res.ESTADO,
+          res.TB_PEDIDOS_MARCA,
+          res.TB_PEDIDOS_CODIGO_ZONA,
+          res.TB_PEDIDOS_CIUDAD,
+          res.TB_PEDIDOS_TIPO_PRODUCTO,
+          res.TB_PEDIDOS_CEDULA,
+        ];
 
-      // Utiliza la pool de conexión para realizar la inserción
-      await pool1.query(queryInsert, valuesInsert);
-
-      console.log(
-        `Datos insertados en pool1: ${JSON.stringify(rowDataWithoutPK)}`
-      );
-    } catch (error) {
-      console.error("Error en la inserción:", error);
-      throw error;
+        await pool1.query(queryInsert, valuesInsert);
+      } catch (error) {
+        console.error("Error en la inserción:", error);
+        throw error;
+      }
     }
   }
 }
