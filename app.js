@@ -5,6 +5,7 @@ const usuarioRoutes = require('./routes/usuarioRoutes');
 const authRoutes = require('./routes/authRoutes');
 const consultarPlRoutes = require('./routes/consultaPl');
 const rotulosPlRoutes = require('./routes/rotulosPl');
+const consultarManifiestoRoutes = require('./routes/consultarManifiesto');
 const https = require('https');
 const fs = require('fs');
 
@@ -19,6 +20,7 @@ app.use(bodyParser.json());
 app.use('/api/usuarios', usuarioRoutes);
 app.use('/api/consultarPl', consultarPlRoutes);
 app.use('/api/rotulosPl', rotulosPlRoutes);
+app.use('/api/consultarManifiesto', consultarManifiestoRoutes);
 app.use('/api/auth', authRoutes);
 
 // Lee los archivos del certificado y la clave privada

@@ -1,5 +1,5 @@
 // usuarioModel.js
-const db = require('../config/db');
+const { pool1 } = require('../config/db');
 
 class Usuario {
   static async create(usuario) {
@@ -8,7 +8,7 @@ class Usuario {
     const values = [nombre, correo, contrasena];
 
     try {
-      const result = await db.query(query, values);
+      const result = await pool1.query(query, values);
       return result;
     } catch (error) {
       throw error;
@@ -19,7 +19,7 @@ class Usuario {
     const query = 'SELECT * FROM usuarios';
 
     try {
-      const usuarios = await db.query(query);
+      const usuarios = await pool1.query(query);
       return usuarios;
     } catch (error) {
       throw error;
@@ -31,7 +31,7 @@ class Usuario {
       const values = [id];
 
       try {
-          const [usuario] = await db.query(query, values);
+          const [usuario] = await pool1.query(query, values);
 
           // Si no se encontró el usuario, devolver null
           return usuario.length > 0 ? usuario[0] : null;
@@ -46,7 +46,7 @@ class Usuario {
     const values = [nombre, correo, contrasena, id];
 
     try {
-      const result = await db.query(query, values);
+      const result = await pool1.query(query, values);
       return result;
     } catch (error) {
       throw error;
@@ -58,7 +58,7 @@ class Usuario {
     const values = [id];
 
     try {
-      const result = await db.query(query, values);
+      const result = await pool1.query(query, values);
       return result;
     } catch (error) {
       throw error;
