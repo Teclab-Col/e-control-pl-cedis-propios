@@ -2,39 +2,14 @@ const { pool1, pool2 } = require("../config/db");
 
 class ConsultarManifiestosModel {
   static async findManifiestoByPkAndInsert(manifiestoReq) {
-    try {
-      const queryComprobante =
-        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? ;";
-      const valueSelect = [manifiestoReq];
-      const resultComprobante = await pool2.query(
-        queryComprobante,
-        valueSelect
-      );
-      if (resultComprobante && resultComprobante.length > 0) {
-        for (const rowDataWithoutPK of resultComprobante) {
-          const objectValues = Object.values(rowDataWithoutPK);
-          for (const values of objectValues) {
-            const res = values;
-            const tipo_vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
-            console.log(`TIPO DE VEHICULO : ${tipo_vehiculo}`);
-            //await this.insertDataIntoPool1(res);
-          }
-        }
-      } else {
-        console.error(
-          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
-        );
-      }
-    } catch (error) {
-      throw error;
-    }
-
+    var cantVD = 0;
+    var cantPQ = 0;
     try {
       const querySelect = `
                 SELECT TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA
                 FROM TB_PEDIDOS_REGISTRADOS
                 WHERE MANIFIESTO_URBANO = ? 
-                UNION 
+                UNION ALL
                 SELECT TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA
                 FROM TB_PEDIDOS_DIGITALIZADO
                 WHERE MANIFIESTO_URBANO = ?`;
@@ -43,6 +18,12 @@ class ConsultarManifiestosModel {
       const resultSelect = await pool2.query(querySelect, valueSelect);
 
       if (resultSelect && resultSelect.length > 0) {
+        // Obtén el primer elemento (el array de objetos)
+        const filasSeleccionadas = resultSelect[0];
+        // Obtén la cantidad de filas (objetos) en el array
+        cantVD = filasSeleccionadas.length;
+        console.log("cantVD : " + cantVD);
+
         for (const rowDataWithoutPK of resultSelect) {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
@@ -73,6 +54,11 @@ class ConsultarManifiestosModel {
       const resultSelectPq = await pool2.query(querySelectPq, valueSelect);
 
       if (resultSelectPq && resultSelectPq.length > 0) {
+        // Obtén el primer elemento (el array de objetos)
+        const filasSeleccionadasPq = resultSelectPq[0];
+        // Obtén la cantidad de filas (objetos) en el array
+        cantPQ = filasSeleccionadasPq.length;
+        console.log("cantPQ : " + cantPQ);
         for (const rowDataWithoutPK of resultSelectPq) {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
@@ -88,7 +74,55 @@ class ConsultarManifiestosModel {
     } catch (error) {
       throw error;
     }
+
+    try {
+      const queryComprobante =
+        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? ;";
+      const valueSelect = [manifiestoReq];
+      const resultComprobante = await pool2.query(
+        queryComprobante,
+        valueSelect
+      );
+      if (resultComprobante && resultComprobante.length > 0) {
+        for (const rowDataWithoutPK of resultComprobante) {
+          const objectValues = Object.values(rowDataWithoutPK);
+          for (const values of objectValues) {
+            const res = values;
+            await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
+          }
+        }
+      } else {
+        console.error(
+          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+        );
+      }
+    } catch (error) {
+      throw error;
+    }
+
     return true;
+  }
+
+  static async insertComprobante(res, manifiestoReq, cantVD, cantPQ) {
+    const tipo_vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
+    if (tipo_vehiculo) {
+      console.log(`cantVD : ${cantVD}`);
+      try {
+        const queryInsert = `INSERT IGNORE INTO TB_NUMERACIONES_COMPROBANTES (CEDI,MANIFIESTO,PLACA,TIPO_DE_VEHICULO,CANT_VD,CANT_PQ) VALUES(?,?,?,?,?,?)`;
+        const valuesInsert = [
+          res.CEDI,
+          manifiestoReq,
+          res.PLACA,
+          res.TB_VEHICULO_TIPO_DE_VEHICULO,
+          cantVD,
+          cantPQ,
+        ];
+        await pool1.query(queryInsert, valuesInsert);
+      } catch (error) {
+        console.error("Error en la inserción Comprobante:", error);
+        throw error;
+      }
+    }
   }
 
   static async insertDataIntoPool1(res) {
@@ -114,7 +148,11 @@ class ConsultarManifiestosModel {
           res.TB_PEDIDOS_CEDULA,
         ];
 
-        await pool1.query(queryInsert, valuesInsert);
+        // Ejecuta la consulta y obtén el resultado
+        const result = await pool1.query(queryInsert, valuesInsert);
+        // Obtén la cantidad de registros afectados
+        const cantVD = result.affectedRows;
+        return cantVD;
       } catch (error) {
         console.error("Error en la inserción:", error);
         throw error;
@@ -126,8 +164,7 @@ class ConsultarManifiestosModel {
     const valorBarcodeCaja = res.no_guia;
 
     if (valorBarcodeCaja) {
-      console.log(`Valor de no_guia : ${valorBarcodeCaja}`);
-
+      //console.log(`Valor de no_guia : ${valorBarcodeCaja}`);
       let cedi;
       if (res.departamento_destino == "Antioquia") {
         cedi = 6;
