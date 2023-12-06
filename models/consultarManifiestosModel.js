@@ -106,7 +106,6 @@ class ConsultarManifiestosModel {
   static async insertComprobante(res, manifiestoReq, cantVD, cantPQ) {
     const tipo_vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
     if (tipo_vehiculo) {
-      console.log(`cantVD : ${cantVD}`);
       try {
         const queryInsert = `INSERT IGNORE INTO TB_NUMERACIONES_COMPROBANTES (CEDI,MANIFIESTO,PLACA,TIPO_DE_VEHICULO,CANT_VD,CANT_PQ) VALUES(?,?,?,?,?,?)`;
         const valuesInsert = [
@@ -122,6 +121,8 @@ class ConsultarManifiestosModel {
         console.error("Error en la inserción Comprobante:", error);
         throw error;
       }
+    } else {
+      console.log("Error sin tipo_vehiculo");
     }
   }
 
