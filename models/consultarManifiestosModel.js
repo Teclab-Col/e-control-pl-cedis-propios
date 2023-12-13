@@ -1,9 +1,10 @@
 const { pool1, pool2 } = require("../config/db");
-
+let i = 0;
 class ConsultarManifiestosModel {
   static async findManifiestoByPkAndInsert(manifiestoReq) {
     var cantVD = 0;
     var cantPQ = 0;
+
     try {
       const querySelect = `
                 SELECT TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS
@@ -78,7 +79,7 @@ class ConsultarManifiestosModel {
 
     try {
       const queryComprobante =
-        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? ;";
+        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? limit 1;";
       const valueSelect = [manifiestoReq];
       const resultComprobante = await pool2.query(
         queryComprobante,
@@ -122,8 +123,6 @@ class ConsultarManifiestosModel {
         console.error("Error en la inserción Comprobante:", error);
         throw error;
       }
-    } else {
-      console.log("Error sin tipo_vehiculo");
     }
   }
 
