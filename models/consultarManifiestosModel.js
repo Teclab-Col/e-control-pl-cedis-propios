@@ -28,6 +28,7 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
+            //console.log("insertDataIntoPool1");
             await this.insertDataIntoPool1(res);
           }
         }
@@ -128,12 +129,44 @@ class ConsultarManifiestosModel {
 
   static async insertDataIntoPool1(res) {
     const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
+    let valorPedido;
     //console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
     if (valorBarcodeCaja) {
       try {
+        const queryValor =
+          "SELECT VALOR, VRSEGUNDACAJA FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
+
+        const value = [
+          res.CEDI,
+          res.TB_PEDIDOS_MARCA,
+          res.TB_PEDIDOS_CODIGO_ZONA,
+          res.TB_PEDIDOS_CIUDAD,
+        ];
+
+        const result = await pool1.query(queryValor, value);
+
+        console.log("Resultado completo:", result);
+
+        if (result[0][0]) {
+          valorPedido =
+            res.TB_PEDIDOS_CAJAS > 1
+              ? result[0][0]?.VRSEGUNDACAJA
+              : result[0][0]?.VALOR;
+          console.log("VALOR: " + valorPedido);
+        } else {
+          console.log("No se encontraron resultados.");
+        }
+      } catch (error) {
+        // Manejar errores aquí
+        console.error("Error:", error);
+      }
+
+      //meter en el catch
+
+      try {
         const queryInsert = `
-            INSERT IGNORE INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT IGNORE INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS, VALOR_UNITARIO)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
 
         const valuesInsert = [
@@ -148,6 +181,7 @@ class ConsultarManifiestosModel {
           res.TB_PEDIDOS_TIPO_PRODUCTO,
           res.TB_PEDIDOS_CEDULA,
           res.TB_PEDIDOS_CAJAS,
+          valorPedido,
         ];
 
         // Ejecuta la consulta y obtén el resultado

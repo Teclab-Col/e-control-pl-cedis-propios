@@ -1,4 +1,4 @@
-INICIAR SERVIDOR LOCAL : php -S localhost:8000
+npm start
 
 # GitHub
 
