@@ -1,23 +1,58 @@
 const { pool1, pool2 } = require("../config/db");
+let i = 0;
 var cantVD = 0;
 var cantPQ = 0;
 let tipoTarifa;
 let tipoVehiculo;
+let valorApagarEbox;
 class ConsultarManifiestosModel {
   /////////////////////////////FUNCION PRINCIPAL////////////////////////////////////////////////
   static async findManifiestoByPkAndInsert(manifiestoReq) {
-    var { tipo_Tarifa, tipo_Vehiculo } = await this.Comprobante(manifiestoReq);
+    var { res, tipo_Tarifa, tipo_Vehiculo } = await this.Comprobante(
+      manifiestoReq
+    );
     tipoTarifa = tipo_Tarifa;
     tipoVehiculo = tipo_Vehiculo;
+    var data = res;
     console.log(
       "DEBUG tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
     );
-    var vd = await this.PedidosVentaDirecta(manifiestoReq);
-    var pq = await this.PedidosEbox(manifiestoReq);
-    return { vd: vd, pq: pq };
+    await this.PedidosEbox(manifiestoReq);
+    await this.PedidosVentaDirecta(manifiestoReq);
+    await this.insertComprobante(data, manifiestoReq, cantVD, cantPQ);
+    var dataPQ = await this.agrupacionPQ(manifiestoReq);
+    var dataVD = await this.agrupacionVD(manifiestoReq);
+    return { VD: dataVD, PQ: dataPQ };
   }
 
   /////////////////////////////FUNCIONES SECUNDARIAS////////////////////////////////////////////////
+  static async agrupacionVD(manifiestoReq) {
+    try {
+      const queryGroup =
+        "SELECT TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CAJAS, COUNT(*) AS CANTIDAD, SUM(VALOR_UNITARIO) AS SUB_TOTAL FROM TB_VALIDACION_ROTULOS_VD WHERE LEIDO = '0' AND MANIFIESTO_URBANO = ? GROUP BY TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CAJAS";
+      const valueSelect = [manifiestoReq];
+      const resultAgrupacion = await pool1.query(queryGroup, valueSelect);
+      if (resultAgrupacion && resultAgrupacion.length > 0) {
+        return resultAgrupacion[0];
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async agrupacionPQ(manifiestoReq) {
+    try {
+      const queryGroup =
+        "SELECT generador, departamento_destino, COUNT(*) AS cantidad, SUM(valor_unit) AS sub_total FROM TB_VALIDACION_ROTULOS_PQ WHERE leido = '0' AND consecutivo_cargue = ? GROUP BY generador, departamento_destino";
+      const valueSelect = [manifiestoReq];
+      const resultAgrupacion = await pool1.query(queryGroup, valueSelect);
+      if (resultAgrupacion && resultAgrupacion.length > 0) {
+        return resultAgrupacion[0];
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
 
   static async Comprobante(manifiestoReq) {
     try {
@@ -37,13 +72,13 @@ class ConsultarManifiestosModel {
             var tipo_Vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
             if (res.CEDI) {
               console.log(
-                "comprobante => tipo_Tarifa: " +
+                "comprobante => tipoTarifa: " +
                   tipo_Tarifa +
-                  " tipo_Vehiculo :" +
+                  " tipoVehiculo :" +
                   tipo_Vehiculo
               );
-              await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
-              return { tipo_Tarifa, tipo_Vehiculo };
+
+              return { res, tipo_Tarifa, tipo_Vehiculo };
             }
           }
         }
@@ -82,8 +117,7 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataVdIntoPool1(res, cantVD);
-            return filasSeleccionadas;
+            await this.insertDataIntoPool1(res, cantVD);
           }
         }
       } else {
@@ -119,11 +153,10 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataPqIntoPool1(res);
-            await this.insertDataVdIntoPool1(res, cantVD, cantPQ);
+            await this.insertDataPqIntoPool1(res, cantPQ);
+            await this.insertDataIntoPool1(res, cantPQ);
           }
         }
-        return filasSeleccionadasPq;
       } else {
         console.error(
           `No se encontraron resultados para el manifiesto ${manifiestoReq}`
@@ -156,11 +189,10 @@ class ConsultarManifiestosModel {
     }
   }
 
-  static async insertDataVdIntoPool1(res, cantVD, cantPQ) {
+  static async insertDataIntoPool1(res) {
     const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
     const tipo_Tarifa = tipoTarifa;
     const tipo_vehiculo = tipoVehiculo;
-    let valorApagarEbox;
     let valorPedido;
     //console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
     if (valorBarcodeCaja) {
@@ -176,8 +208,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          const resultJSON = JSON.stringify(result);
-
+          //const resultJSON = JSON.stringify(result);
           //console.log("CEDI =  " + res.CEDI);
           //console.log("Resultado en formato JSON:", resultJSON);
 
@@ -210,7 +241,7 @@ class ConsultarManifiestosModel {
           } else {
             //console.log("No se encontraron resultados.");
           }
-        } else if (tipoDeTarifa == "2") {
+        } else if (tipo_Tarifa == "2") {
           // Tarifa por entrega
           const queryValor =
             "SELECT VALOR, VRSEGUNDACAJA FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
@@ -224,7 +255,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          console.log("Resultado completo:", result);
+          //console.log("Resultado completo:", result);
 
           if (result[0][0]) {
             if (res.TB_PEDIDOS_TIPO_PRODUCTO == "PEDIDO") {
@@ -250,7 +281,7 @@ class ConsultarManifiestosModel {
           } else {
             console.log("No se encontraron resultados.");
           }
-        } else if (tipoDeTarifa == "3") {
+        } else if (tipo_Tarifa == "3") {
           // Tarifa vehiculo dedicado
           const queryValor =
             "SELECT VALOR_MIXTO, VALOR_UNITARIO_MIXTO FROM TB_LISTA_DE_PRECIOS_DEDICADOS WHERE VALOR_UNITARIO_MIXTO <> '' AND CEDI = ? AND TIPO_DE_VEHICULO = ?";
@@ -259,7 +290,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          console.log("Resultado completo:", result);
+          //console.log("Resultado completo:", result);
 
           if (result[0][0]) {
             // Resultados
@@ -267,13 +298,17 @@ class ConsultarManifiestosModel {
             const valorUnitarioMixto = result[0][0]?.VALOR_UNITARIO_MIXTO;
 
             let totalRegistros;
+            console.log("Debugging  cantPQ: " + cantPQ);
 
             if (cantPQ && cantVD) {
               totalRegistros = parseFloat(cantVD) + parseFloat(cantPQ);
+              console.log("Debugging totalRegistros 1: " + totalRegistros);
             } else if (cantVD) {
               totalRegistros = parseFloat(cantVD);
+              console.log("Debugging totalRegistros 2: " + totalRegistros);
             } else if (cantPQ) {
               totalRegistros = parseFloat(cantPQ);
+              console.log("Debugging totalRegistros 3: " + totalRegistros);
             }
 
             // Calculos Matematicos
