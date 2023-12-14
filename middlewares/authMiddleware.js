@@ -37,6 +37,17 @@ const authMiddleware = {
       return res.status(401).json({ mensaje: 'Token no válido' });
     }
   },
+
+  // Nueva función para generar un token con más tiempo de expiración
+  generarTokenConMasTiempo: (usuario) => {
+    const token = jwt.sign(
+      { usuario },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' } // Por ejemplo, aquí el token expirará en 7 días
+    );
+
+    return token;
+  },
 };
 
 module.exports = authMiddleware;
