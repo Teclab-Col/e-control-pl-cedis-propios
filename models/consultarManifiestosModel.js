@@ -2,10 +2,20 @@ const { pool1, pool2 } = require("../config/db");
 let i = 0;
 var cantVD = 0;
 var cantPQ = 0;
+let tipoTarifa;
+let tipoVehiculo;
 class ConsultarManifiestosModel {
   static async findManifiestoByPkAndInsert(manifiestoReq) {
-   
+    var { tipo_Tarifa, tipo_Vehiculo } = await this.function1(manifiestoReq);
+    tipoTarifa = tipo_Tarifa;
+    tipoVehiculo = tipo_Vehiculo;
+    console.log(
+      "DEBUG " + "tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
+    );
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
     try {
       const querySelect = `
                 SELECT TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS
@@ -30,7 +40,7 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataIntoPool1(res, cantVD, );
+            await this.insertDataIntoPool1(res, cantVD);
           }
         }
       } else {
@@ -43,6 +53,7 @@ class ConsultarManifiestosModel {
       throw error;
     }
 
+    ////////////////////////////////////////////////////////////////////////////////////////////////
     try {
       const querySelectPq = `SELECT no_guia, nit_remitente, tipo_servicio, generador, ciudad_origen, departamento_origen, no_pedido, 
             no_factura_c, cedula, ciudad_destino, departamento_destino, contenido, categoria, valor_declarado, metodo_pago, 
@@ -51,7 +62,6 @@ class ConsultarManifiestosModel {
             valor_manejo, liquidado, consecutivo_facturacion, no_factura, valor_unit FROM TB_PAQUETEOS 
             WHERE consecutivo_cargue = ?`;
 
-      //const valueSelect = ["MU-5491231123-STV208-6"];
       const valueSelect = [manifiestoReq];
       const resultSelectPq = await pool2.query(querySelectPq, valueSelect);
 
@@ -77,7 +87,12 @@ class ConsultarManifiestosModel {
     } catch (error) {
       throw error;
     }
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    return true;
+  }
 
+  /////////////////////////////FUNCIONES//////////////////////////////////////////////////////////////
+  static async function1(manifiestoReq) {
     try {
       const queryComprobante =
         "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? limit 1;";
@@ -91,7 +106,15 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
+            var tipo_Tarifa = res.TIPO_DE_TARIFA;
+            var tipo_Vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
+            if (res.CEDI) {
+              console.log(
+                "tipoTarifa: " + tipoTarifa + " tipoVehiculo :" + tipoVehiculo
+              );
+              await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
+              return { tipo_Tarifa, tipo_Vehiculo };
+            }
           }
         }
       } else {
@@ -102,8 +125,6 @@ class ConsultarManifiestosModel {
     } catch (error) {
       throw error;
     }
-
-    return true;
   }
 
   static async insertComprobante(res, manifiestoReq, cantVD, cantPQ) {
@@ -127,26 +148,71 @@ class ConsultarManifiestosModel {
       }
     }
   }
-  
+
   static async insertDataIntoPool1(res, cantVD, cantPQ) {
     const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
-    const tipoDeTarifa = '3';
-    const tipo_vehiculo = 'VAN';
+    const tipo_Tarifa = tipoTarifa;
+    const tipo_vehiculo = tipoVehiculo;
     let valorApagarEbox;
     let valorPedido;
     //console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
     if (valorBarcodeCaja) {
       try {
-
-        if (tipoDeTarifa == '1') {
-
+        //console.log("tipo_vehiculo =  " + tipo_vehiculo);
+        //console.log("tipo_tarifa =  " + tipo_Tarifa);
+        if (tipo_Tarifa == "1") {
           // Tarifa vehiculo dedicado
           const queryValor =
-          "SELECT VALOR, VALOR_VD FROM TB_LISTA_DE_PRECIOS_DEDICADOS WHERE VALOR <> '' AND CEDI = ? AND TIPO_DE_VEHICULO = ?";
+            "SELECT VALOR, VALOR_VD FROM TB_LISTA_DE_PRECIOS_DEDICADOS WHERE VALOR <> '' AND CEDI = ? AND TIPO_DE_VEHICULO = ?";
+
+          const value = [res.CEDI, tipo_vehiculo];
+
+          const result = await pool1.query(queryValor, value);
+
+          const resultJSON = JSON.stringify(result);
+
+          //console.log("CEDI =  " + res.CEDI);
+          //console.log("Resultado en formato JSON:", resultJSON);
+
+          if (result[0][0]) {
+            // Resultados
+            const valorDedicado = result[0][0]?.VALOR;
+            const valorVentaDirecta = result[0][0]?.VALOR_VD;
+            //console.log("Valor Dedicado: " + valorDedicado);
+            //console.log("Valor Venta Directa: " + valorVentaDirecta);
+
+            // Calculos Matematicos
+            const valorTotalVd = cantVD * valorVentaDirecta;
+            const restaVentaDirectaValorDedicado = valorTotalVd - valorDedicado;
+
+            // Resultados
+            valorApagarEbox = restaVentaDirectaValorDedicado / cantPQ;
+            valorPedido = valorTotalVd / cantVD;
+
+            /*console.log(
+              "VALOR VD: " +
+                valorPedido +
+                "VALOR PQ: " +
+                valorApagarEbox +
+                "TOTAL VD: " +
+                cantVD +
+                "TOTAL PQ: " +
+                cantPQ
+            );
+            */
+          } else {
+            //console.log("No se encontraron resultados.");
+          }
+        } else if (tipoDeTarifa == "2") {
+          // Tarifa por entrega
+          const queryValor =
+            "SELECT VALOR, VRSEGUNDACAJA FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
 
           const value = [
-          res.CEDI,
-          tipo_vehiculo,
+            res.CEDI,
+            res.TB_PEDIDOS_MARCA,
+            res.TB_PEDIDOS_CODIGO_ZONA,
+            res.TB_PEDIDOS_CIUDAD,
           ];
 
           const result = await pool1.query(queryValor, value);
@@ -154,138 +220,80 @@ class ConsultarManifiestosModel {
           console.log("Resultado completo:", result);
 
           if (result[0][0]) {
-            
-            // Resultados
-            const valorDedicado = result[0][0]?.VALOR;
-            const valorVentaDirecta = result[0][0]?.VALOR_VD;
-
-            // Calculos Matematicos
-            const valorTotalVd = cantVD * valorVentaDirecta;
-            const restaVentaDirectaValorDedicado = valorTotalVd - valorDedicado; 
-
-            // Resultados
-            valorApagarEbox = restaVentaDirectaValorDedicado / cantPQ;
-            valorPedido = valorTotalVd / cantVD;
-
-            
-            console.log("VALOR VD: " + valorPedido + "VALOR PQ: " + valorApagarEbox + "TOTAL VD: " + cantVD + "TOTAL PQ: " + cantPQ);
-
-          } else {
-          console.log("No se encontraron resultados.");
-          }
-
-        
-        } else if (tipoDeTarifa == '2') {
-            
-          // Tarifa por entrega
-          const queryValor =
-          "SELECT VALOR, VRSEGUNDACAJA FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
-
-        const value = [
-          res.CEDI,
-          res.TB_PEDIDOS_MARCA,
-          res.TB_PEDIDOS_CODIGO_ZONA,
-          res.TB_PEDIDOS_CIUDAD,
-        ];
-
-        const result = await pool1.query(queryValor, value);
-
-        console.log("Resultado completo:", result);
-
-        if (result[0][0]) {
-
-            if (res.TB_PEDIDOS_TIPO_PRODUCTO == 'PEDIDO') {
-
-                if (res.TB_PEDIDOS_MARCA == 'BELCORP') {
-
-                    if (res.TB_PEDIDOS_CAJAS == '1') {
-
-                        valorPedido = result[0][0]?.VALOR;
-                      
-                    } else {
-
-                      valorPedido = '0';
-                      
-                    }
-                  
+            if (res.TB_PEDIDOS_TIPO_PRODUCTO == "PEDIDO") {
+              if (res.TB_PEDIDOS_MARCA == "BELCORP") {
+                if (res.TB_PEDIDOS_CAJAS == "1") {
+                  valorPedido = result[0][0]?.VALOR;
                 } else {
-
-                    valorPedido =
-                    res.TB_PEDIDOS_CAJAS > 1
+                  valorPedido = "0";
+                }
+              } else {
+                valorPedido =
+                  res.TB_PEDIDOS_CAJAS > 1
                     ? result[0][0]?.VRSEGUNDACAJA
                     : result[0][0]?.VALOR;
-                  
-                }
+              }
 
-                console.log("VALOR: " + valorPedido);
-              
+              console.log("VALOR: " + valorPedido);
             } else {
+              console.log(
+                "VALOR NO ENCONTRADO: " + res.TB_PEDIDOS_TIPO_PRODUCTO
+              );
+            }
+          } else {
+            console.log("No se encontraron resultados.");
+          }
+        } else if (tipoDeTarifa == "3") {
+          // Tarifa vehiculo dedicado
+          const queryValor =
+            "SELECT VALOR_MIXTO, VALOR_UNITARIO_MIXTO FROM TB_LISTA_DE_PRECIOS_DEDICADOS WHERE VALOR_UNITARIO_MIXTO <> '' AND CEDI = ? AND TIPO_DE_VEHICULO = ?";
 
-              console.log("VALOR NO ENCONTRADO: " + res.TB_PEDIDOS_TIPO_PRODUCTO);
-              
+          const value = [res.CEDI, tipo_vehiculo];
+
+          const result = await pool1.query(queryValor, value);
+
+          console.log("Resultado completo:", result);
+
+          if (result[0][0]) {
+            // Resultados
+            const valorDedicadoMixto = result[0][0]?.VALOR_MIXTO;
+            const valorUnitarioMixto = result[0][0]?.VALOR_UNITARIO_MIXTO;
+
+            let totalRegistros;
+
+            if (cantPQ && cantVD) {
+              totalRegistros = parseFloat(cantVD) + parseFloat(cantPQ);
+            } else if (cantVD) {
+              totalRegistros = parseFloat(cantVD);
+            } else if (cantPQ) {
+              totalRegistros = parseFloat(cantPQ);
             }
 
-        } else {
-          console.log("No se encontraron resultados.");
-        }
+            // Calculos Matematicos
+            const valorMixtoDividido = valorDedicadoMixto / totalRegistros;
+            const valorUnitarioMixtoTotal =
+              parseFloat(valorUnitarioMixto) + parseFloat(valorMixtoDividido);
+            const totalValorUnitarioMixto =
+              totalRegistros * valorUnitarioMixtoTotal;
 
+            // Resultados
+            valorPedido = totalValorUnitarioMixto / totalRegistros;
+            valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
 
-      } else if (tipoDeTarifa == '3') {
-
-        // Tarifa vehiculo dedicado
-        const queryValor =
-        "SELECT VALOR_MIXTO, VALOR_UNITARIO_MIXTO FROM TB_LISTA_DE_PRECIOS_DEDICADOS WHERE VALOR_UNITARIO_MIXTO <> '' AND CEDI = ? AND TIPO_DE_VEHICULO = ?";
-
-        const value = [
-        res.CEDI,
-        tipo_vehiculo,
-        ];
-
-        const result = await pool1.query(queryValor, value);
-
-        console.log("Resultado completo:", result);
-
-        if (result[0][0]) {
-          
-          // Resultados
-          const valorDedicadoMixto = result[0][0]?.VALOR_MIXTO;
-          const valorUnitarioMixto = result[0][0]?.VALOR_UNITARIO_MIXTO;
-
-          let totalRegistros;
-          
-          if (cantPQ && cantVD) {
-
-             totalRegistros = parseFloat(cantVD) + parseFloat(cantPQ);
-            
-          } else if (cantVD) {
-
-            totalRegistros = parseFloat(cantVD)
-            
-
-          } else if (cantPQ) {
-
-            totalRegistros = parseFloat(cantPQ)
-            
+            console.log(
+              "VALOR VD: " +
+                valorPedido +
+                "VALOR PQ: " +
+                valorApagarEbox +
+                " TOTAL VD: " +
+                cantVD +
+                " TOTAL PQ: " +
+                cantPQ
+            );
+          } else {
+            console.log("No se encontraron resultados.");
           }
-          
-          // Calculos Matematicos
-          const valorMixtoDividido = valorDedicadoMixto / totalRegistros;
-          const valorUnitarioMixtoTotal = parseFloat(valorUnitarioMixto) + parseFloat(valorMixtoDividido);
-          const totalValorUnitarioMixto = totalRegistros * valorUnitarioMixtoTotal; 
-
-          // Resultados
-          valorPedido = totalValorUnitarioMixto / totalRegistros;  
-          valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
-
-          
-          console.log("VALOR VD: " + valorPedido + "VALOR PQ: " + valorApagarEbox + " TOTAL VD: " + cantVD + " TOTAL PQ: " + cantPQ);
-
-        } else {
-        console.log("No se encontraron resultados.");
         }
-
-      }
-
       } catch (error) {
         // Manejar errores aquí
         console.error("Error:", error);
