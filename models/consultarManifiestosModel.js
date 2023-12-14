@@ -1,21 +1,63 @@
 const { pool1, pool2 } = require("../config/db");
-let i = 0;
 var cantVD = 0;
 var cantPQ = 0;
 let tipoTarifa;
 let tipoVehiculo;
 class ConsultarManifiestosModel {
+  /////////////////////////////FUNCION PRINCIPAL////////////////////////////////////////////////
   static async findManifiestoByPkAndInsert(manifiestoReq) {
-    var { tipo_Tarifa, tipo_Vehiculo } = await this.function1(manifiestoReq);
+    var { tipo_Tarifa, tipo_Vehiculo } = await this.Comprobante(manifiestoReq);
     tipoTarifa = tipo_Tarifa;
     tipoVehiculo = tipo_Vehiculo;
     console.log(
-      "DEBUG " + "tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
+      "DEBUG tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
     );
+    var vd = await this.PedidosVentaDirecta(manifiestoReq);
+    var pq = await this.PedidosEbox(manifiestoReq);
+    return { vd: vd, pq: pq };
+  }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////FUNCIONES SECUNDARIAS////////////////////////////////////////////////
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+  static async Comprobante(manifiestoReq) {
+    try {
+      const queryComprobante =
+        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? limit 1;";
+      const valueSelect = [manifiestoReq];
+      const resultComprobante = await pool2.query(
+        queryComprobante,
+        valueSelect
+      );
+      if (resultComprobante && resultComprobante.length > 0) {
+        for (const rowDataWithoutPK of resultComprobante) {
+          const objectValues = Object.values(rowDataWithoutPK);
+          for (const values of objectValues) {
+            const res = values;
+            var tipo_Tarifa = res.TIPO_DE_TARIFA;
+            var tipo_Vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
+            if (res.CEDI) {
+              console.log(
+                "comprobante => tipo_Tarifa: " +
+                  tipo_Tarifa +
+                  " tipo_Vehiculo :" +
+                  tipo_Vehiculo
+              );
+              await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
+              return { tipo_Tarifa, tipo_Vehiculo };
+            }
+          }
+        }
+      } else {
+        /*console.error(
+          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+        );*/
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async PedidosVentaDirecta(manifiestoReq) {
     try {
       const querySelect = `
                 SELECT TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS
@@ -34,26 +76,28 @@ class ConsultarManifiestosModel {
         const filasSeleccionadas = resultSelect[0];
         // Obtén la cantidad de filas (objetos) en el array
         cantVD = filasSeleccionadas.length;
-        console.log("cantVD : " + cantVD);
+        console.log("PedidosVentaDirecta = > cantVD : " + cantVD);
 
         for (const rowDataWithoutPK of resultSelect) {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataIntoPool1(res, cantVD);
+            await this.insertDataVdIntoPool1(res, cantVD);
+            return filasSeleccionadas;
           }
         }
       } else {
         console.error(
-          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+          `No se encontraron resultados en Venta directa para el manifiesto ${manifiestoReq}`
         );
       }
       //return resultSelect;
     } catch (error) {
       throw error;
     }
+  }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////
+  static async PedidosEbox(manifiestoReq) {
     try {
       const querySelectPq = `SELECT no_guia, nit_remitente, tipo_servicio, generador, ciudad_origen, departamento_origen, no_pedido, 
             no_factura_c, cedula, ciudad_destino, departamento_destino, contenido, categoria, valor_declarado, metodo_pago, 
@@ -70,57 +114,20 @@ class ConsultarManifiestosModel {
         const filasSeleccionadasPq = resultSelectPq[0];
         // Obtén la cantidad de filas (objetos) en el array
         cantPQ = filasSeleccionadasPq.length;
-        console.log("cantPQ : " + cantPQ);
+        console.log("PedidosEbox => cantPQ : " + cantPQ);
         for (const rowDataWithoutPK of resultSelectPq) {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
             await this.insertDataPqIntoPool1(res);
-            await this.insertDataIntoPool1(res, cantPQ);
+            await this.insertDataVdIntoPool1(res, cantVD, cantPQ);
           }
         }
+        return filasSeleccionadasPq;
       } else {
         console.error(
           `No se encontraron resultados para el manifiesto ${manifiestoReq}`
         );
-      }
-    } catch (error) {
-      throw error;
-    }
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    return true;
-  }
-
-  /////////////////////////////FUNCIONES//////////////////////////////////////////////////////////////
-  static async function1(manifiestoReq) {
-    try {
-      const queryComprobante =
-        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? limit 1;";
-      const valueSelect = [manifiestoReq];
-      const resultComprobante = await pool2.query(
-        queryComprobante,
-        valueSelect
-      );
-      if (resultComprobante && resultComprobante.length > 0) {
-        for (const rowDataWithoutPK of resultComprobante) {
-          const objectValues = Object.values(rowDataWithoutPK);
-          for (const values of objectValues) {
-            const res = values;
-            var tipo_Tarifa = res.TIPO_DE_TARIFA;
-            var tipo_Vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
-            if (res.CEDI) {
-              console.log(
-                "tipoTarifa: " + tipoTarifa + " tipoVehiculo :" + tipoVehiculo
-              );
-              await this.insertComprobante(res, manifiestoReq, cantVD, cantPQ);
-              return { tipo_Tarifa, tipo_Vehiculo };
-            }
-          }
-        }
-      } else {
-        /*console.error(
-          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
-        );*/
       }
     } catch (error) {
       throw error;
@@ -149,7 +156,7 @@ class ConsultarManifiestosModel {
     }
   }
 
-  static async insertDataIntoPool1(res, cantVD, cantPQ) {
+  static async insertDataVdIntoPool1(res, cantVD, cantPQ) {
     const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
     const tipo_Tarifa = tipoTarifa;
     const tipo_vehiculo = tipoVehiculo;
@@ -340,15 +347,17 @@ class ConsultarManifiestosModel {
     if (valorBarcodeCaja) {
       //console.log(`Valor de no_guia : ${valorBarcodeCaja}`);
       let cedi;
-      if (res.departamento_destino == "Antioquia") {
+      if (res.departamento_destino == "Cundinamarca") {
+        cedi = 5;
+      } else if (res.departamento_destino == "Antioquia") {
         cedi = 6;
+      } else if (res.departamento_destino == "Atlantico") {
+        cedi = 7;
       } else if (
         res.departamento_destino == "Valle del cauca" ||
         res.departamento_destino == "Cali"
       ) {
         cedi = 39;
-      } else {
-        cedi = 0;
       }
 
       try {
