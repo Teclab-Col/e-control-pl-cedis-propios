@@ -4,6 +4,7 @@ var cantVD = 0;
 var cantPQ = 0;
 let tipoTarifa;
 let tipoVehiculo;
+let valorApagarEbox;
 class ConsultarManifiestosModel {
   /////////////////////////////FUNCION PRINCIPAL////////////////////////////////////////////////
   static async findManifiestoByPkAndInsert(manifiestoReq) {
@@ -16,13 +17,42 @@ class ConsultarManifiestosModel {
     console.log(
       "DEBUG tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
     );
-    await this.PedidosVentaDirecta(manifiestoReq);
     await this.PedidosEbox(manifiestoReq);
+    await this.PedidosVentaDirecta(manifiestoReq);
     await this.insertComprobante(data, manifiestoReq, cantVD, cantPQ);
-    return true;
+    var dataPQ = await this.agrupacionPQ(manifiestoReq);
+    var dataVD = await this.agrupacionVD(manifiestoReq);
+    return { VD: dataVD, PQ: dataPQ };
   }
 
   /////////////////////////////FUNCIONES SECUNDARIAS////////////////////////////////////////////////
+  static async agrupacionVD(manifiestoReq) {
+    try {
+      const queryGroup =
+        "SELECT TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CAJAS, COUNT(*) AS CANTIDAD, SUM(VALOR_UNITARIO) AS SUB_TOTAL FROM TB_VALIDACION_ROTULOS_VD WHERE LEIDO = '0' AND MANIFIESTO_URBANO = ? GROUP BY TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CAJAS";
+      const valueSelect = [manifiestoReq];
+      const resultAgrupacion = await pool1.query(queryGroup, valueSelect);
+      if (resultAgrupacion && resultAgrupacion.length > 0) {
+        return resultAgrupacion[0];
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async agrupacionPQ(manifiestoReq) {
+    try {
+      const queryGroup =
+        "SELECT generador, departamento_destino, COUNT(*) AS cantidad, SUM(valor_unit) AS sub_total FROM TB_VALIDACION_ROTULOS_PQ WHERE leido = '0' AND consecutivo_cargue = ? GROUP BY generador, departamento_destino";
+      const valueSelect = [manifiestoReq];
+      const resultAgrupacion = await pool1.query(queryGroup, valueSelect);
+      if (resultAgrupacion && resultAgrupacion.length > 0) {
+        return resultAgrupacion[0];
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
 
   static async Comprobante(manifiestoReq) {
     try {
@@ -123,7 +153,7 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataPqIntoPool1(res);
+            await this.insertDataPqIntoPool1(res, cantPQ);
             await this.insertDataIntoPool1(res, cantPQ);
           }
         }
@@ -159,11 +189,10 @@ class ConsultarManifiestosModel {
     }
   }
 
-  static async insertDataIntoPool1(res, cantVD, cantPQ) {
+  static async insertDataIntoPool1(res) {
     const valorBarcodeCaja = res.TB_PEDIDOS_BARCODE_CAJA;
     const tipo_Tarifa = tipoTarifa;
     const tipo_vehiculo = tipoVehiculo;
-    let valorApagarEbox;
     let valorPedido;
     //console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
     if (valorBarcodeCaja) {
@@ -226,7 +255,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          console.log("Resultado completo:", result);
+          //console.log("Resultado completo:", result);
 
           if (result[0][0]) {
             if (res.TB_PEDIDOS_TIPO_PRODUCTO == "PEDIDO") {
@@ -261,7 +290,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          console.log("Resultado completo:", result);
+          //console.log("Resultado completo:", result);
 
           if (result[0][0]) {
             // Resultados
@@ -269,13 +298,17 @@ class ConsultarManifiestosModel {
             const valorUnitarioMixto = result[0][0]?.VALOR_UNITARIO_MIXTO;
 
             let totalRegistros;
+            console.log("Debugging  cantPQ: " + cantPQ);
 
             if (cantPQ && cantVD) {
               totalRegistros = parseFloat(cantVD) + parseFloat(cantPQ);
+              console.log("Debugging totalRegistros 1: " + totalRegistros);
             } else if (cantVD) {
               totalRegistros = parseFloat(cantVD);
+              console.log("Debugging totalRegistros 2: " + totalRegistros);
             } else if (cantPQ) {
               totalRegistros = parseFloat(cantPQ);
+              console.log("Debugging totalRegistros 3: " + totalRegistros);
             }
 
             // Calculos Matematicos
