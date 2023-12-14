@@ -35,8 +35,8 @@ httpsServer.listen(PORT, IP, () => {
   console.log(`Servidor en ejecución en https://${IP}:${PORT}`);
 });
 
-// ? Usar este para el servidor local
-// app.listen(app.get("port"), () => {
-//   console.log(`Servidor http escuchando en http://localhost:${PORT}`)
-// })
+//? Usar este para el servidor local
+ //app.listen(app.get("port"), () => {
+   //console.log(`Servidor http escuchando en http://localhost:${PORT}`)
+ //})
 
