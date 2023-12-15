@@ -4,7 +4,7 @@ var cantVD = 0;
 var cantPQ = 0;
 let tipoTarifa;
 let tipoVehiculo;
-let valorApagarEbox;
+let valorApagarEbox = 0;
 class ConsultarManifiestosModel {
   /////////////////////////////FUNCION PRINCIPAL////////////////////////////////////////////////
   static async findManifiestoByPkAndInsert(manifiestoReq) {
@@ -17,8 +17,8 @@ class ConsultarManifiestosModel {
     console.log(
       "DEBUG tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
     );
-    await this.PedidosVentaDirecta(manifiestoReq);
     await this.PedidosEbox(manifiestoReq);
+    await this.PedidosVentaDirecta(manifiestoReq);
     await this.insertComprobante(data, manifiestoReq, cantVD, cantPQ);
     var dataPQ = await this.agrupacionPQ(manifiestoReq);
     var dataVD = await this.agrupacionVD(manifiestoReq);
@@ -57,7 +57,7 @@ class ConsultarManifiestosModel {
   static async Comprobante(manifiestoReq) {
     try {
       const queryComprobante =
-        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM `TB_CARGUE` LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE `MANIFIESTO_URBANO` = ? limit 1;";
+        "SELECT TB_CARGUE.CEDI, TB_CARGUE.PLACA, TB_CARGUE.TIPO_DE_TARIFA, TB_VEHICULO.TB_VEHICULO_TIPO_DE_VEHICULO FROM TB_CARGUE LEFT JOIN TB_VEHICULO ON TB_CARGUE.PLACA = TB_VEHICULO.TB_VEHICULO_PLACA WHERE MANIFIESTO_URBANO = ? limit 1;";
       const valueSelect = [manifiestoReq];
       const resultComprobante = await pool2.query(
         queryComprobante,
@@ -84,7 +84,7 @@ class ConsultarManifiestosModel {
         }
       } else {
         /*console.error(
-          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+          No se encontraron resultados para el manifiesto ${manifiestoReq}
         );*/
       }
     } catch (error) {
@@ -122,7 +122,7 @@ class ConsultarManifiestosModel {
         }
       } else {
         console.error(
-          `No se encontraron resultados en Venta directa para el manifiesto ${manifiestoReq}`
+          No se encontraron resultados en Venta directa para el manifiesto ${manifiestoReq}
         );
       }
       //return resultSelect;
@@ -153,12 +153,13 @@ class ConsultarManifiestosModel {
           const objectValues = Object.values(rowDataWithoutPK);
           for (const values of objectValues) {
             const res = values;
-            await this.insertDataPqIntoPool1(res);
+            await this.insertDataPqIntoPool1(res, cantPQ);
+            await this.insertDataIntoPool1(res, cantPQ);
           }
         }
       } else {
         console.error(
-          `No se encontraron resultados para el manifiesto ${manifiestoReq}`
+          No se encontraron resultados para el manifiesto ${manifiestoReq}
         );
       }
     } catch (error) {
@@ -170,18 +171,7 @@ class ConsultarManifiestosModel {
     const tipo_vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
     if (tipo_vehiculo) {
       try {
-        const queryInsert = `
-    INSERT INTO TB_NUMERACIONES_COMPROBANTES 
-        (CEDI, MANIFIESTO, PLACA, TIPO_DE_VEHICULO, TIPO_DE_TARIFA, CANT_VD, CANT_PQ)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-        CEDI = VALUES(CEDI),
-        PLACA = VALUES(PLACA),
-        TIPO_DE_VEHICULO = VALUES(TIPO_DE_VEHICULO),
-        TIPO_DE_TARIFA = VALUES(TIPO_DE_TARIFA),
-        CANT_VD = VALUES(CANT_VD),
-        CANT_PQ = VALUES(CANT_PQ);
-`;
+        const queryInsert = INSERT IGNORE INTO TB_NUMERACIONES_COMPROBANTES (CEDI,MANIFIESTO,PLACA,TIPO_DE_VEHICULO,TIPO_DE_TARIFA,CANT_VD,CANT_PQ) VALUES(?,?,?,?,?,?,?);
         const valuesInsert = [
           res.CEDI,
           manifiestoReq,
@@ -204,7 +194,7 @@ class ConsultarManifiestosModel {
     const tipo_Tarifa = tipoTarifa;
     const tipo_vehiculo = tipoVehiculo;
     let valorPedido;
-    //console.log(`Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja}`);
+    //console.log(Valor de TB_PEDIDOS_BARCODE_CAJA : ${valorBarcodeCaja});
     if (valorBarcodeCaja) {
       try {
         //console.log("tipo_vehiculo =  " + tipo_vehiculo);
@@ -237,7 +227,7 @@ class ConsultarManifiestosModel {
             valorApagarEbox = restaVentaDirectaValorDedicado / cantPQ;
             valorPedido = valorTotalVd / cantVD;
 
-            console.log(
+            /*console.log(
               "VALOR VD: " +
                 valorPedido +
                 "VALOR PQ: " +
@@ -247,13 +237,14 @@ class ConsultarManifiestosModel {
                 "TOTAL PQ: " +
                 cantPQ
             );
+            */
           } else {
-            console.log("No se encontraron resultados TARIFA 1.");
+            //console.log("No se encontraron resultados.");
           }
         } else if (tipo_Tarifa == "2") {
           // Tarifa por entrega
           const queryValor =
-            "SELECT VALOR, VRSEGUNDACAJA, CATALOGO, PREMIO FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
+            "SELECT VALOR, VRSEGUNDACAJA FROM TB_LISTA_DE_PRECIOS_CEDIS_PROPIOS WHERE CEDI = ? AND MARCA = ? AND ZONA = ? AND POBLACION = ? ;";
 
           const value = [
             res.CEDI,
@@ -264,7 +255,7 @@ class ConsultarManifiestosModel {
 
           const result = await pool1.query(queryValor, value);
 
-          console.log("Result[0][0]", result[0][0]);
+          //console.log("Resultado completo:", result);
 
           if (result[0][0]) {
             if (res.TB_PEDIDOS_TIPO_PRODUCTO == "PEDIDO") {
@@ -282,17 +273,13 @@ class ConsultarManifiestosModel {
               }
 
               console.log("VALOR: " + valorPedido);
-            } else if (res.TB_PEDIDOS_TIPO_PRODUCTO == "CATALOGO") {
-              valorPedido = result[0][0]?.CATALOGO;
-            } else if (res.TB_PEDIDOS_TIPO_PRODUCTO == "AFP") {
-              valorPedido = result[0][0]?.PREMIO;
             } else {
               console.log(
                 "VALOR NO ENCONTRADO: " + res.TB_PEDIDOS_TIPO_PRODUCTO
               );
             }
           } else {
-            console.log("No se encontraron resultados TARIFA 2");
+            console.log("No se encontraron resultados.");
           }
         } else if (tipo_Tarifa == "3") {
           // Tarifa vehiculo dedicado
@@ -315,15 +302,13 @@ class ConsultarManifiestosModel {
 
             if (cantPQ && cantVD) {
               totalRegistros = parseFloat(cantVD) + parseFloat(cantPQ);
-              console.log(
-                "Debugging totalRegistros cantVD Y cantPQ: " + totalRegistros
-              );
+              console.log("Debugging totalRegistros 1: " + totalRegistros);
             } else if (cantVD) {
               totalRegistros = parseFloat(cantVD);
-              console.log("Debugging totalRegistros cantVD: " + totalRegistros);
+              console.log("Debugging totalRegistros 2: " + totalRegistros);
             } else if (cantPQ) {
               totalRegistros = parseFloat(cantPQ);
-              console.log("Debugging totalRegistros cantPQ: " + totalRegistros);
+              console.log("Debugging totalRegistros 3: " + totalRegistros);
             }
 
             // Calculos Matematicos
@@ -334,79 +319,66 @@ class ConsultarManifiestosModel {
               totalRegistros * valorUnitarioMixtoTotal;
 
             // Resultados
-            console.log("valorApagarEbox => totalRegistros :" + totalRegistros);
-            if (totalRegistros > 0) {
+            
+
+            if(totalRegistros > 0){
               valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
               valorPedido = totalValorUnitarioMixto / totalRegistros;
-            } else {
+            }else{
               valorApagarEbox = 0;
               valorPedido = 0;
             }
+            
 
             console.log(
               "VALOR VD: " +
                 valorPedido +
-                ", VALOR PQ: " +
+                "VALOR PQ: " +
                 valorApagarEbox +
-                ", TOTAL VD: " +
+                " TOTAL VD: " +
                 cantVD +
-                ", TOTAL PQ: " +
+                " TOTAL PQ: " +
                 cantPQ
             );
           } else {
-            console.log("No se encontraron resultados TARIFA 3");
+            console.log("No se encontraron resultados.");
           }
         }
+
+        try {
+          const queryInsert = `
+              INSERT IGNORE INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS, VALOR_UNITARIO)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+  
+          const valuesInsert = [
+            res.TB_PEDIDOS_BARCODE_CAJA,
+            res.CEDI,
+            res.MANIFIESTO_URBANO,
+            res.PLACA_DE_REPARTO,
+            res.ESTADO,
+            res.TB_PEDIDOS_MARCA,
+            res.TB_PEDIDOS_CODIGO_ZONA,
+            res.TB_PEDIDOS_CIUDAD,
+            res.TB_PEDIDOS_TIPO_PRODUCTO,
+            res.TB_PEDIDOS_CEDULA,
+            res.TB_PEDIDOS_CAJAS,
+            valorPedido,
+          ];
+  
+          // Ejecuta la consulta y obtén el resultado
+          const result = await pool1.query(queryInsert, valuesInsert);
+          // Obtén la cantidad de registros afectados
+          const cantVD = result.affectedRows;
+          return cantVD;
+        } catch (error) {
+          console.error("Error en la inserción:", error);
+          throw error;
+        }
+
       } catch (error) {
         // Manejar errores aquí
-        console.error("Error:", error);
-      }
-
-      //meter en el catch
-
-      try {
-        const queryInsert = `
-    INSERT INTO TB_VALIDACION_ROTULOS_VD 
-        (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, 
-        TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, 
-        TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS, VALOR_UNITARIO)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-        CEDI = VALUES(CEDI),
-        PLACA_DE_REPARTO = VALUES(PLACA_DE_REPARTO),
-        ESTADO = VALUES(ESTADO),
-        TB_PEDIDOS_MARCA = VALUES(TB_PEDIDOS_MARCA),
-        TB_PEDIDOS_CODIGO_ZONA = VALUES(TB_PEDIDOS_CODIGO_ZONA),
-        TB_PEDIDOS_CIUDAD = VALUES(TB_PEDIDOS_CIUDAD),
-        TB_PEDIDOS_TIPO_PRODUCTO = VALUES(TB_PEDIDOS_TIPO_PRODUCTO),
-        TB_PEDIDOS_CEDULA = VALUES(TB_PEDIDOS_CEDULA),
-        TB_PEDIDOS_CAJAS = VALUES(TB_PEDIDOS_CAJAS),
-        VALOR_UNITARIO = VALUES(VALOR_UNITARIO);
-`;
-
-        const valuesInsert = [
-          res.TB_PEDIDOS_BARCODE_CAJA,
-          res.CEDI,
-          res.MANIFIESTO_URBANO,
-          res.PLACA_DE_REPARTO,
-          res.ESTADO,
-          res.TB_PEDIDOS_MARCA,
-          res.TB_PEDIDOS_CODIGO_ZONA,
-          res.TB_PEDIDOS_CIUDAD,
-          res.TB_PEDIDOS_TIPO_PRODUCTO,
-          res.TB_PEDIDOS_CEDULA,
-          res.TB_PEDIDOS_CAJAS,
-          valorPedido,
-        ];
-
-        // Ejecuta la consulta y obtén el resultado
-        const result = await pool1.query(queryInsert, valuesInsert);
-        // Obtén la cantidad de registros afectados
-        const cantVD = result.affectedRows;
-        return cantVD;
-      } catch (error) {
-        console.error("Error en la inserción:", error);
-        throw error;
+        console.error("Error tipo_tarifa:", error);
       }
     }
   }
@@ -415,7 +387,7 @@ class ConsultarManifiestosModel {
     const valorBarcodeCaja = res.no_guia;
 
     if (valorBarcodeCaja) {
-      //console.log(`Valor de no_guia : ${valorBarcodeCaja}`);
+      //console.log(Valor de no_guia : ${valorBarcodeCaja});
       let cedi;
       if (res.departamento_destino == "Cundinamarca") {
         cedi = 5;
@@ -432,53 +404,14 @@ class ConsultarManifiestosModel {
 
       try {
         const queryInsert = `
-        INSERT INTO TB_VALIDACION_ROTULOS_PQ 
-            (no_guia, cedi, nit_remitente, tipo_servicio, generador, ciudad_origen, departamento_origen, no_pedido, 
-            no_factura_c, cedula, ciudad_destino, departamento_destino, contenido, categoria, valor_declarado, metodo_pago, 
-            valor_del_recaudo, alto, ancho, largo, peso, peso_volumetrico, cant_cajas, estado, token, codigo_cargue, 
-            consecutivo_cargue, manifiesto_urbano, placa_en_reparto, fecha, fecha_recoleccion, entregado, tarifa, 
-            valor_manejo, liquidado, consecutivo_facturacion, no_factura, valor_unit)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ON DUPLICATE KEY UPDATE
-            cedi = VALUES(cedi),
-            nit_remitente = VALUES(nit_remitente),
-            tipo_servicio = VALUES(tipo_servicio),
-            generador = VALUES(generador),
-            ciudad_origen = VALUES(ciudad_origen),
-            departamento_origen = VALUES(departamento_origen),
-            no_pedido = VALUES(no_pedido),
-            no_factura_c = VALUES(no_factura_c),
-            cedula = VALUES(cedula),
-            ciudad_destino = VALUES(ciudad_destino),
-            departamento_destino = VALUES(departamento_destino),
-            contenido = VALUES(contenido),
-            categoria = VALUES(categoria),
-            valor_declarado = VALUES(valor_declarado),
-            metodo_pago = VALUES(metodo_pago),
-            valor_del_recaudo = VALUES(valor_del_recaudo),
-            alto = VALUES(alto),
-            ancho = VALUES(ancho),
-            largo = VALUES(largo),
-            peso = VALUES(peso),
-            peso_volumetrico = VALUES(peso_volumetrico),
-            cant_cajas = VALUES(cant_cajas),
-            estado = VALUES(estado),
-            token = VALUES(token),
-            codigo_cargue = VALUES(codigo_cargue),
-            consecutivo_cargue = VALUES(consecutivo_cargue),
-            manifiesto_urbano = VALUES(manifiesto_urbano),
-            placa_en_reparto = VALUES(placa_en_reparto),
-            fecha = VALUES(fecha),
-            fecha_recoleccion = VALUES(fecha_recoleccion),
-            entregado = VALUES(entregado),
-            tarifa = VALUES(tarifa),
-            valor_manejo = VALUES(valor_manejo),
-            liquidado = VALUES(liquidado),
-            consecutivo_facturacion = VALUES(consecutivo_facturacion),
-            no_factura = VALUES(no_factura),
-            valor_unit = VALUES(valor_unit);
-`;
-        //console.log("Debug valorApagarEbox :" + valorApagarEbox);
+            INSERT IGNORE INTO TB_VALIDACION_ROTULOS_PQ (no_guia, cedi, nit_remitente, tipo_servicio, generador, ciudad_origen, departamento_origen, no_pedido, 
+                      no_factura_c, cedula, ciudad_destino, departamento_destino, contenido, categoria, valor_declarado, metodo_pago, 
+                      valor_del_recaudo, alto, ancho, largo, peso, peso_volumetrico, cant_cajas, estado, token, codigo_cargue, 
+                      consecutivo_cargue, manifiesto_urbano, placa_en_reparto, fecha, fecha_recoleccion, entregado, tarifa, 
+                      valor_manejo, liquidado, consecutivo_facturacion, no_factura, valor_unit)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        `;
+
         const valuesInsert = [
           res.no_guia,
           cedi,
