@@ -344,42 +344,41 @@ class ConsultarManifiestosModel {
             console.log("No se encontraron resultados.");
           }
         }
+
+        try {
+          const queryInsert = `
+              INSERT IGNORE INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS, VALOR_UNITARIO)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+  
+          const valuesInsert = [
+            res.TB_PEDIDOS_BARCODE_CAJA,
+            res.CEDI,
+            res.MANIFIESTO_URBANO,
+            res.PLACA_DE_REPARTO,
+            res.ESTADO,
+            res.TB_PEDIDOS_MARCA,
+            res.TB_PEDIDOS_CODIGO_ZONA,
+            res.TB_PEDIDOS_CIUDAD,
+            res.TB_PEDIDOS_TIPO_PRODUCTO,
+            res.TB_PEDIDOS_CEDULA,
+            res.TB_PEDIDOS_CAJAS,
+            valorPedido,
+          ];
+  
+          // Ejecuta la consulta y obtén el resultado
+          const result = await pool1.query(queryInsert, valuesInsert);
+          // Obtén la cantidad de registros afectados
+          const cantVD = result.affectedRows;
+          return cantVD;
+        } catch (error) {
+          console.error("Error en la inserción:", error);
+          throw error;
+        }
+
       } catch (error) {
         // Manejar errores aquí
-        console.error("Error:", error);
-      }
-
-      //meter en el catch
-
-      try {
-        const queryInsert = `
-            INSERT IGNORE INTO TB_VALIDACION_ROTULOS_VD (TB_PEDIDOS_BARCODE_CAJA, CEDI, MANIFIESTO_URBANO, PLACA_DE_REPARTO, ESTADO, TB_PEDIDOS_MARCA, TB_PEDIDOS_CODIGO_ZONA, TB_PEDIDOS_CIUDAD, TB_PEDIDOS_TIPO_PRODUCTO, TB_PEDIDOS_CEDULA, TB_PEDIDOS_CAJAS, VALOR_UNITARIO)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        const valuesInsert = [
-          res.TB_PEDIDOS_BARCODE_CAJA,
-          res.CEDI,
-          res.MANIFIESTO_URBANO,
-          res.PLACA_DE_REPARTO,
-          res.ESTADO,
-          res.TB_PEDIDOS_MARCA,
-          res.TB_PEDIDOS_CODIGO_ZONA,
-          res.TB_PEDIDOS_CIUDAD,
-          res.TB_PEDIDOS_TIPO_PRODUCTO,
-          res.TB_PEDIDOS_CEDULA,
-          res.TB_PEDIDOS_CAJAS,
-          valorPedido,
-        ];
-
-        // Ejecuta la consulta y obtén el resultado
-        const result = await pool1.query(queryInsert, valuesInsert);
-        // Obtén la cantidad de registros afectados
-        const cantVD = result.affectedRows;
-        return cantVD;
-      } catch (error) {
-        console.error("Error en la inserción:", error);
-        throw error;
+        console.error("Error tipo_tarifa:", error);
       }
     }
   }
