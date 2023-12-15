@@ -43,7 +43,7 @@ const authMiddleware = {
     const token = jwt.sign(
       { usuario },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' } // Por ejemplo, aquí el token expirará en 7 días
+      { expiresIn: '8d' } // Por ejemplo, aquí el token expirará en 7 días
     );
 
     return token;
