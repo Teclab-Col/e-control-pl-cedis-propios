@@ -17,8 +17,8 @@ class ConsultarManifiestosModel {
     console.log(
       "DEBUG tipoTarifa: " + tipoTarifa + " tipoVehiculo: " + tipoVehiculo
     );
-    await this.PedidosEbox(manifiestoReq);
     await this.PedidosVentaDirecta(manifiestoReq);
+    await this.PedidosEbox(manifiestoReq);
     await this.insertComprobante(data, manifiestoReq, cantVD, cantPQ);
     var dataPQ = await this.agrupacionPQ(manifiestoReq);
     var dataVD = await this.agrupacionVD(manifiestoReq);
@@ -154,7 +154,6 @@ class ConsultarManifiestosModel {
           for (const values of objectValues) {
             const res = values;
             await this.insertDataPqIntoPool1(res);
-            //await this.insertDataIntoPool1(res);
           }
         }
       } else {
@@ -171,7 +170,18 @@ class ConsultarManifiestosModel {
     const tipo_vehiculo = res.TB_VEHICULO_TIPO_DE_VEHICULO;
     if (tipo_vehiculo) {
       try {
-        const queryInsert = `INSERT IGNORE INTO TB_NUMERACIONES_COMPROBANTES (CEDI,MANIFIESTO,PLACA,TIPO_DE_VEHICULO,TIPO_DE_TARIFA,CANT_VD,CANT_PQ) VALUES(?,?,?,?,?,?,?)`;
+        const queryInsert = `
+    INSERT INTO TB_NUMERACIONES_COMPROBANTES 
+        (CEDI, MANIFIESTO, PLACA, TIPO_DE_VEHICULO, TIPO_DE_TARIFA, CANT_VD, CANT_PQ)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+        CEDI = VALUES(CEDI),
+        PLACA = VALUES(PLACA),
+        TIPO_DE_VEHICULO = VALUES(TIPO_DE_VEHICULO),
+        TIPO_DE_TARIFA = VALUES(TIPO_DE_TARIFA),
+        CANT_VD = VALUES(CANT_VD),
+        CANT_PQ = VALUES(CANT_PQ);
+`;
         const valuesInsert = [
           res.CEDI,
           manifiestoReq,
@@ -324,17 +334,23 @@ class ConsultarManifiestosModel {
               totalRegistros * valorUnitarioMixtoTotal;
 
             // Resultados
-            valorPedido = totalValorUnitarioMixto / totalRegistros;
-            valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
+            console.log("valorApagarEbox => totalRegistros :" + totalRegistros);
+            if (totalRegistros > 0) {
+              valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
+              valorPedido = totalValorUnitarioMixto / totalRegistros;
+            } else {
+              valorApagarEbox = 0;
+              valorPedido = 0;
+            }
 
             console.log(
               "VALOR VD: " +
                 valorPedido +
-                "VALOR PQ: " +
+                ", VALOR PQ: " +
                 valorApagarEbox +
-                " TOTAL VD: " +
+                ", TOTAL VD: " +
                 cantVD +
-                " TOTAL PQ: " +
+                ", TOTAL PQ: " +
                 cantPQ
             );
           } else {
@@ -462,7 +478,7 @@ class ConsultarManifiestosModel {
             no_factura = VALUES(no_factura),
             valor_unit = VALUES(valor_unit);
 `;
-
+        //console.log("Debug valorApagarEbox :" + valorApagarEbox);
         const valuesInsert = [
           res.no_guia,
           cedi,
