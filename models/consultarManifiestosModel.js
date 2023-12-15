@@ -4,7 +4,7 @@ var cantVD = 0;
 var cantPQ = 0;
 let tipoTarifa;
 let tipoVehiculo;
-let valorApagarEbox;
+let valorApagarEbox = 0;
 class ConsultarManifiestosModel {
   /////////////////////////////FUNCION PRINCIPAL////////////////////////////////////////////////
   static async findManifiestoByPkAndInsert(manifiestoReq) {
@@ -319,8 +319,16 @@ class ConsultarManifiestosModel {
               totalRegistros * valorUnitarioMixtoTotal;
 
             // Resultados
-            valorPedido = totalValorUnitarioMixto / totalRegistros;
-            valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
+            
+
+            if(totalRegistros > 0){
+              valorApagarEbox = totalValorUnitarioMixto / totalRegistros;
+              valorPedido = totalValorUnitarioMixto / totalRegistros;
+            }else{
+              valorApagarEbox = 0;
+              valorPedido = 0;
+            }
+            
 
             console.log(
               "VALOR VD: " +
